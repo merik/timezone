@@ -16,17 +16,35 @@ def to_datetime(date_string):
 def ordinal_day_of_month(date):
     #return 1, 2... (first, second (sunday) day of month)
     month = date.month
-    index = 0
+    index = 1
     newdate = date - timedelta(days = 7)
     while (newdate.month == month):
         index = index + 1
         newdate = newdate - timedelta(days = 7)
     return index
 
-def weekday(date, timezone_string):
-    # monday = 0, sunday = 6
-    timezone = pytz.timezone(timezone_string)
-    return date.astimezone(timezone).weekday()
+def local_month(date, timezone_string):
+    timezone = pytz.timezone(timezone_string)  
+    month = date.astimezone(timezone).month
+    return month
+
+def local_hour(date, timezone_string):
+    timezone = pytz.timezone(timezone_string)  
+    hour = date.astimezone(timezone).hour
+    return hour
+def local_minute(date, timezone_string):
+    timezone = pytz.timezone(timezone_string)  
+    minute = date.astimezone(timezone).minute
+    return minute
+
+def local_weekday(date, timezone_string):
+    # returns: 1 = sunday, 2 = monday, 7 = saturday
+    timezone = pytz.timezone(timezone_string)  
+    wd = date.astimezone(timezone).isoweekday() ## monday = 1, sunday = 7
+    wd = wd + 1
+    if wd == 8:  # sunday
+        wd = 1
+    return wd
 
 def is_weekday_last_of_month(date):
     month = date.month
@@ -44,8 +62,6 @@ def get_timezone_list():
             timezoneJsonString += ",\n"
         timezoneJsonString += timezoneJson 
         counter = counter + 1
-        if counter == 2:
-            break
         if counter % 10 == 0:
             time.sleep(10)
         else:
@@ -58,24 +74,59 @@ def get_timezone_detail(timezone):
     r = requests.get(url = "%stimezone/%s" %(base_url, timezone))
     data = r.json()
     json_data = json.dumps(data, indent = 0)
-    json_string = build_timezone_json_pretty_string(timezone, json_data, 4)
-    #return json.dumps(data, indent = 8)
+    json_string = build_timezone_json_pretty_string(timezone, data, json_data, 4)
     return json_string
 
-def build_timezone_json_pretty_string(timezone_string, timezone_json, indent):
-    begin_indent = " " * indent
-    json_string = begin_indent + '"' + timezone_string + '": {\n'
-    lines = timezone_json.splitlines()
+def build_timezone_json_pretty_string(timezone_string, timezone_json, timezone_json_string, indent):
+    spaces = " " * indent
+    json_string = spaces + '"' + timezone_string + '": {\n'
+    if timezone_json["dst_offset"] and timezone_json["dst_from"] and timezone_json["dst_until"]:
+        json_string += spaces + spaces + '"dst_offset": {}'.format(timezone_json["dst_offset"]) + ',\n'
+        json_string += spaces + spaces + '"dst_from": {\n'
+        json_string += build_dst_json(timezone_json["dst_from"], timezone_string, indent * 3)
+        json_string += spaces + spaces + "},\n"
+        json_string += spaces + spaces + '"dst_until": {\n'
+        json_string += build_dst_json(timezone_json["dst_until"], timezone_string, indent * 3)
+        json_string += spaces + spaces + "},\n"
+    else:
+        json_string += spaces + spaces + '"dst_offset": null,' + '\n'
+        json_string += spaces + spaces + '"dst_from": null,' + '\n'
+        json_string += spaces + spaces + '"dst_until": null,' + '\n'
+        
+    json_string += spaces + spaces + '"raw": {\n'
+    lines = timezone_json_string.splitlines()
     for line in lines:
         if len(line) > 0:
             if line == "{" or line == "}":
                 continue
-            json_string += begin_indent + begin_indent + line + "\n"
-    json_string += begin_indent + "}"
+            json_string += spaces + spaces + spaces + line + "\n"
+    json_string += spaces + spaces + "}\n"
+    json_string += spaces + "}"
     return json_string
-timezoneString = get_timezone_list()
-print(timezoneString)
-#file = open("timezone.json", "w")
-#file.write(timezoneString)
-#file.close()
 
+def build_dst_json(dst_string, timezone_string, indent):
+    spaces = " " * indent
+    date = to_datetime(dst_string)
+    month = local_month(date, timezone_string)
+    hour = local_hour(date, timezone_string)
+    minute = local_minute(date, timezone_string)
+    ordinal = ordinal_day_of_month(date)
+    wd = local_weekday(date, timezone_string)
+    json_string = ""
+    json_string += spaces + '"month": {},\n'.format(month)
+    json_string += spaces + '"ordinal": {},\n'.format(ordinal)
+    json_string += spaces + '"weekday": {},\n'.format(wd)
+    json_string += spaces + '"hour": {},\n'.format(hour)
+    json_string += spaces + '"minute": {}\n'.format(minute)
+    return json_string
+
+def save_to_file(filename, json_string):
+    file = open(filename, "w")
+    file.write(json_string)
+    file.close()
+
+if __name__ == '__main__':
+    timezone_string = get_timezone_list()
+    print(timezone_string)
+    save_to_file('timezone.json', timezone_string)
+    
