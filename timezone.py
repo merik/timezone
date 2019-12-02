@@ -13,12 +13,13 @@ def to_datetime(date_string):
     date = datetime.strptime(date_string, datetime_format)
     return date
 
-def ordinal_day_of_month(date):
+def ordinal_day_of_month(date, dst_offset, timezone_string):
     #return 1, 2... (first, second (sunday) day of month)
-    month = date.month
+    month = local_month(date, timezone_string)
     index = 1
-    newdate = date - timedelta(days = 7)
-    while (newdate.month == month):
+    newdate = date - timedelta(days = 7) - timedelta(seconds = dst_offset)
+    print(dst_offset)
+    while (local_month(newdate, timezone_string) == month):
         index = index + 1
         newdate = newdate - timedelta(days = 7)
     return index
@@ -83,10 +84,10 @@ def build_timezone_json_pretty_string(timezone_string, timezone_json, timezone_j
     if timezone_json["dst_offset"] and timezone_json["dst_from"] and timezone_json["dst_until"]:
         json_string += spaces + spaces + '"dst_offset": {}'.format(timezone_json["dst_offset"]) + ',\n'
         json_string += spaces + spaces + '"dst_from": {\n'
-        json_string += build_dst_json(timezone_json["dst_from"], timezone_string, indent * 3)
+        json_string += build_dst_json(timezone_json["dst_from"], timezone_string, indent * 3, timezone_json["dst_offset"])
         json_string += spaces + spaces + "},\n"
         json_string += spaces + spaces + '"dst_until": {\n'
-        json_string += build_dst_json(timezone_json["dst_until"], timezone_string, indent * 3)
+        json_string += build_dst_json(timezone_json["dst_until"], timezone_string, indent * 3, timezone_json["dst_offset"])
         json_string += spaces + spaces + "},\n"
     else:
         json_string += spaces + spaces + '"dst_offset": null,' + '\n'
@@ -104,17 +105,17 @@ def build_timezone_json_pretty_string(timezone_string, timezone_json, timezone_j
     json_string += spaces + "}"
     return json_string
 
-def build_dst_json(dst_string, timezone_string, indent):
+def build_dst_json(dst_string, timezone_string, indent, dst_offset):
     spaces = " " * indent
     date = to_datetime(dst_string)
     month = local_month(date, timezone_string)
     hour = local_hour(date, timezone_string)
     minute = local_minute(date, timezone_string)
-    ordinal = ordinal_day_of_month(date)
+    ordinal = ordinal_day_of_month(date, dst_offset, timezone_string)
     wd = local_weekday(date, timezone_string)
     json_string = ""
     json_string += spaces + '"month": {},\n'.format(month)
-    json_string += spaces + '"ordinal": {},\n'.format(ordinal)
+    json_string += spaces + '"weekday_ordinal": {},\n'.format(ordinal)
     json_string += spaces + '"weekday": {},\n'.format(wd)
     json_string += spaces + '"hour": {},\n'.format(hour)
     json_string += spaces + '"minute": {}\n'.format(minute)
@@ -128,5 +129,5 @@ def save_to_file(filename, json_string):
 if __name__ == '__main__':
     timezone_string = get_timezone_list()
     print(timezone_string)
-    save_to_file('timezone.json', timezone_string)
+    save_to_file('timezone2.json', timezone_string)
     
